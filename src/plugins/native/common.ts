@@ -1,6 +1,6 @@
 import { has, isEmpty } from 'lodash-es';
-import loggerUtil from '@/util/loggerUtil';
-import { IDFormat, makeUUID } from '@/util/uuidUtil';
+import loggerUtil from '@/lib/utils/loggerUtil';
+import { IDFormat, makeUUID } from '@/lib/utils/uuidUtil';
 import { DevicePluginResponseType } from './device/types';
 import { PLUGIN_ERROR_CODES } from '@/constants/pluginErrors';
 import { MobBridge, MobBridgeLg, PluginResponse, PluginRequest } from './types';
@@ -47,7 +47,12 @@ mobBridge.lg.isMobile = {
 /**
  * command: flutter plugin 호출
  */
-mobBridge.lg.command = function (callbackID: string, service: string, action: string, params: unknown) {
+mobBridge.lg.command = function (
+  callbackID: string,
+  service: string,
+  action: string,
+  params: unknown
+) {
   console.log('mobBridge.lg.command!!!!!!@@@@@@@@@@@@@@');
   console.log('callbackID', callbackID);
   console.log('service', service);
@@ -84,8 +89,11 @@ mobBridge.lg.command = function (callbackID: string, service: string, action: st
  * web -> android / ios 실행
  */
 mobBridge.lg.exec = function (
-  successCallback: (paramObj: PluginResponse, respObject: DevicePluginResponseType | {}) => void,
-  failCallback: (paramObj: PluginResponse, respObject: DevicePluginResponseType | {}) => void,
+  successCallback: (
+    paramObj: PluginResponse,
+    respObject: DevicePluginResponseType | object
+  ) => void,
+  failCallback: (paramObj: PluginResponse, respObject: DevicePluginResponseType | object) => void,
   callbackID: string,
   service: string,
   action: string,
@@ -154,7 +162,10 @@ function callbackListener(respObject: PluginResponse) {
       ? safeParse(respObjectData.params || '{}')
       : respObjectData.params;
 
-  if (respObjectData.errorCode === PLUGIN_ERROR_CODES.CMM00 || respObjectData.errorCode === PLUGIN_ERROR_CODES.CMM01) {
+  if (
+    respObjectData.errorCode === PLUGIN_ERROR_CODES.CMM00 ||
+    respObjectData.errorCode === PLUGIN_ERROR_CODES.CMM01
+  ) {
     mobBridge.lg.callbacks[respObjectData.callbackID].success(respObjectData, paramObj);
   } else {
     mobBridge.lg.callbacks[respObjectData.callbackID].fail(respObjectData, paramObj);
@@ -183,7 +194,7 @@ function multiWebviewCloseCallbackListener(message: unknown) {
   }
 }
 
-export const setMultiwebviewCloseFunction = (func?: Function) => {
+export const setMultiwebviewCloseFunction = (func?: (message: unknown) => void) => {
   console.log('&&&&&&& setMultiwebviewCloseFunction &&&&&&&');
   if (typeof func === 'function') {
     window.$$CloseWebviewCallback = func;
@@ -213,7 +224,9 @@ const makeCallbackId = (command: PluginRequest) => {
  * @param id
  */
 const removeCallback = (id: string) => {
-  has(callbacks, id) && delete callbacks[id];
+  if (has(callbacks, id)) {
+    delete callbacks[id];
+  }
 };
 
 const PLUGIN_TIMEOUT = 10000;
@@ -223,8 +236,8 @@ const PLUGIN_TIMEOUT = 10000;
  */
 export const callPlugin = (
   command: PluginRequest & {
-    success: (paramObj: PluginResponse, respObject: DevicePluginResponseType | {}) => void;
-    fail: (paramObj: PluginResponse, respObject: DevicePluginResponseType | {}) => void;
+    success: (paramObj: PluginResponse, respObject: DevicePluginResponseType | object) => void;
+    fail: (paramObj: PluginResponse, respObject: DevicePluginResponseType | object) => void;
   }
 ) => {
   if (!command.callbackID) {
@@ -248,7 +261,10 @@ export const callPlugin = (
     removeCallback(callbackID);
   }, PLUGIN_TIMEOUT);
 
-  const wrappedSuccess = (paramObj: PluginResponse, respObject: DevicePluginResponseType | {}) => {
+  const wrappedSuccess = (
+    paramObj: PluginResponse,
+    respObject: DevicePluginResponseType | object
+  ) => {
     if (paramObj.errorCode === PLUGIN_ERROR_CODES.CMM01) {
       console.log(callbacks[paramObj.callbackID], 'timeout 제거');
       clearTimeout(timeoutId);
@@ -258,7 +274,7 @@ export const callPlugin = (
     }
   };
 
-  const wrappedFail = (paramObj: PluginResponse, respObject: DevicePluginResponseType | {}) => {
+  const wrappedFail = (paramObj: PluginResponse, respObject: DevicePluginResponseType | object) => {
     clearTimeout(timeoutId);
     command.fail(paramObj, respObject);
   };
@@ -267,7 +283,14 @@ export const callPlugin = (
   callbacks[callbackID] = command;
 
   try {
-    mobBridge.lg.exec(wrappedSuccess, wrappedFail, command.callbackID, command.service, command.action, command.params);
+    mobBridge.lg.exec(
+      wrappedSuccess,
+      wrappedFail,
+      command.callbackID,
+      command.service,
+      command.action,
+      command.params
+    );
   } catch (e) {
     // 에러 처리
     console.log(e);
